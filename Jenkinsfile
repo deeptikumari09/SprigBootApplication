@@ -1,38 +1,62 @@
 pipeline {
     agent any
-    tools{
-        maven "MAVEN_HOME"
+	
+	  tools
+    {
+       maven "Maven"
     }
-    stages {
-        stage('Clean') {
+ stages {
+      stage('checkout') {
+           steps {
+             
+                git branch: 'master', url: 'https://github.com/devops4solutions/CI-CD-using-Docker.git'
+             
+          }
+        }
+	 stage('Execute Maven') {
+           steps {
+             
+                sh 'mvn package'             
+          }
+        }
+        
+
+  stage('Docker Build and Tag') {
+           steps {
+              
+                sh 'docker build -t samplewebapp:latest .' 
+                sh 'docker tag samplewebapp nikhilnidhi/samplewebapp:latest'
+                //sh 'docker tag samplewebapp nikhilnidhi/samplewebapp:$BUILD_NUMBER'
+               
+          }
+        }
+     
+  stage('Publish image to Docker Hub') {
+          
             steps {
-                bat 'mvn -f pom.xml clean'
-                echo 'Cleaning..'
+        withDockerRegistry([ credentialsId: "dockerHub", url: "" ]) {
+          sh  'docker push nikhilnidhi/samplewebapp:latest'
+        //  sh  'docker push nikhilnidhi/samplewebapp:$BUILD_NUMBER' 
+        }
+                  
+          }
+        }
+     
+      stage('Run Docker container on Jenkins Agent') {
+             
+            steps 
+			{
+                sh "docker run -d -p 8003:8080 nikhilnidhi/samplewebapp"
+ 
             }
         }
-        stage('Compile') {
+ stage('Run Docker container on remote hosts') {
+             
             steps {
-                bat 'mvn -f pom.xml compile'
-                echo 'Compiling..'
-            }
-        }
-        stage('Test') {
-            steps {
-                bat 'mvn -f pom.xml test'
-                echo 'Testing..'
-            }
-        }
-        stage('Packaging') {
-            steps {
-                bat 'mvn -f pom.xml package'
-                echo 'Packaging..'
-            }
-        }
-        stage('Install') {
-            steps {
-                bat 'mvn -f pom.xml install'
-                echo 'Installing..'
+                sh "docker -H ssh://jenkins@172.31.28.25 run -d -p 8003:8080 nikhilnidhi/samplewebapp"
+ 
             }
         }
     }
-}
+	}
+    
